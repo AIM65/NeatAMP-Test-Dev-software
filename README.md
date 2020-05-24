@@ -14,6 +14,11 @@ PCB can be found :
 In order to run the software a rotary encoder and some LEDs should be added to
 NeatAMP main board. Connection diagram can be found in /Hardware folder.
 
+### Software environment
+
+Project made with ST CubeIDE, using CubeMX and STM32CubeF0 Firmware Package
+V1.11.
+
 ### Software description
 
 #### Main goal:
@@ -63,7 +68,15 @@ basis the incoming file while receiving it. It uses the following commands or
 marker to take actions. Commands are group of 4 characters, in some case an
 empty line is also interpreted as a command.
 
-![](media/c3d81a9717826351a7e1ef706729ac1b.emf)
+| Command   | Description                                    |
+|-----------|------------------------------------------------|
+| \@cfn     | Set the name of the Config preset in memory    |
+| \@fln     | Set the name of the FilterSet preset in memory |
+| //wr      | Start of FilterSet data block                  |
+| cfg\_     | Start of first Config data block               |
+| { 0x      | Load a couple register / data                  |
+| //sw      | Start of Block 4 (swap command)                |
+| emptyline | End of FilterSet data Block                    |
 
 #### Additional goal:
 

@@ -2,7 +2,7 @@
 *.cproject
 *.mxproject
 *.project
-*.lauch
+*.launch
 *.ld
 
 #ST Cube IDE files
