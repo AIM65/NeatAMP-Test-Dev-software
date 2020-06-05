@@ -6,7 +6,7 @@ NeatAMP based on Texas Instrument TAS3251 chip which embed a DSP.
 
 ### Hardware
 
-NeatAMP amplifier design is logged into a DIYAudio thread where schematics and
+NeatAMP amplifier design process is logged into a DIYAudio thread where schematics and
 PCB can be found :
 
 >   <https://www.diyaudio.com/forums/class-d/325826-design-log-neat-2x170w-i2s-i2c-controlled-integrated-dsp-amp-tas3251.html>
@@ -24,7 +24,7 @@ V1.11.
 #### Main goal:
 
 This software is designed to ease development of a target use case of the
-TAS3251 without the TI EVM board (TI Evaluation Module Board). As the TAS is
+TAS3251 without the TI EVM board (TI Evaluation Module Board). As the TAS3251 is
 highly configurable and contains dozens of registers to setup, development will
 mainly consist of designing and tuning the configuration of the DSP of the TAS,
 which will involve many design/tests/updates cycles: changing many times the
@@ -32,11 +32,13 @@ dozens of registers of the DSP.
 
 Designing and tuning DSP is easily feasible with TI Pure Path Console 3
 software, but without a TI EVM board, PPC3 software can't connect to the TAS and
-interact with it. But PPC3 can produce an output file which content has to be
+interact with it. PPC3 can produce an output file which content has to be
 loaded into TAS registers. This is a text file (a C .h header file). The board
-software allows to upload via a serial link the file coming from PPC3, process
-it and store it in the board EEPROM. The board software allows to store many
-files and to choose the one to play in order to do some comparisons and choices.
+software allows to download this file via a serial link, the to process
+it and store it in the board EEPROM. This software allows to easily load those files
+, to store up to five of them in the board EEPROM and to choose the one to play in order
+to do some comparisons and choices. This avoids having to compile your code every time
+you want to change a DSP parameter.
 
 ###### File handling by the software
 
@@ -55,8 +57,8 @@ files and to choose the one to play in order to do some comparisons and choices.
 
 The software allow to download in NetAMP the PPC3 generated files. While
 downloading the file, the software catch the configuration data and store them
-into one of the eight Configuration data memory in the EEPROM. It also catch the
-FilterSet data and store them in one off the eight FilterSet data memory in the
+into one of the five Configuration data memory in the EEPROM. It also catch the
+FilterSet data and store them in one off the five FilterSet data memory in the
 EEPROM. Thus Configuration and FilterSet data are dissociated, this allows
 software to play any combination on the two. Configuration data contains
 clocking setup, audio stream parameter (I2S, TDM,…, \# of bits, etc…), error
@@ -64,16 +66,22 @@ detection, reset management, etc..., those are mainly in & out interface data
 and DAC data. The FilterSet data contains DSP data: the various coefficients.
 
 In order to catch Config and FilterSet data, the software parse on line by line
-basis the incoming file while receiving it. It uses the following commands or
-marker to take actions. Commands are group of 4 characters, in some case an
-empty line is also interpreted as a command.
+basis the incoming file while receiving it. It uses the following tags to take actions.
+Tags are group of 4 characters. An empty line is also interpreted as a tag.
 
-| Command   | Description                                    |
+Format of the.h file change with the kind of speaker configuration you choose in PPC3
+(2.0 vs other). That added some complexification in the tags and the processing made by the software.
+
+|    Tag    | Description                                    |
 |-----------|------------------------------------------------|
 | \@cfn     | Set the name of the Config preset in memory    |
 | \@fln     | Set the name of the FilterSet preset in memory |
 | //wr      | Start of FilterSet data block                  |
+| //Co      | Start of FilterSet data block (Alias of //wr)  |
+| YM h      | Start of Subwoofer on switch                   |
+| //Sa      | Start of clock configuarion data               |
 | cfg\_     | Start of first Config data block               |
+| /pro      | Confirm first Config data block detection      |
 | { 0x      | Load a couple register / data                  |
 | //sw      | Start of Block 4 (swap command)                |
 | emptyline | End of FilterSet data Block                    |
@@ -91,18 +99,29 @@ led.
 A serial monitor implement various serial commands.
 
 #### Typical usage of the software:
-
+Straight from PPC3:
 -   Generate a .h file with PPC3 (use burst=1)
+-   Download it, tell NeatAMpto use it.
+
+It also feasible to :
 
 -   Edit the file
-
     -   before block 2 add \@cfn [name on 12 char] and \@fln [name on 12 char]
-        commands to name the preset in board EEPROM (otherwise file name will be
+        tags to name the preset in board EEPROM (otherwise file name will be
         used)
-
-    -   drop block 1
-
--   Dowload it to NeatAMP, tell NeatAMP to use this news file, or part of
+    -   drop block 1 
+    -   edit registers and biquad values
+-   Download it, tell NeatAMpto use it.
+    
+    
+Create a file from scratch :
+-   add @cfn and @fln tags to set the names
+-   add cfg\ tag on next line
+-   add /pro tag on the following line
+-   add you Config datas with { 0x00, 0x00 } format.
+-   add //wr tag on next line
+-   add you FilterSet Data with { 0x00, 0x00 } format.    
+-   Download it, tell NeatAMpto use it.
 
 -   Listen / measure
 
@@ -116,7 +135,7 @@ A serial monitor implement various serial commands.
 
 At first startup, or when an issue is encounter with EEPROM, EEPROM is
 reinitialized. By default the software contains no configuration data and is not
-able to initialize the TAS.
+able to initialize the TAS3251.
 
 NeatAmp should be loaded with a configuration file in order to start the TAS.
 
@@ -145,18 +164,15 @@ The software communicate to the host PC with a serial link :
 ###### Following commands can be passed over the serial link:
 
 -   ?...Command list
-
 -   m...Memory usage
-
 -   l...Preset to load
-
 -   p...Preset to play
-
 -   e...Preset to erase
-
 -   d...Download preset
-
 -   s...Status
+-   b...Out Crossbar L&R
+-   c...Out Crossbar L&Sub
+
 
 ###### User Interface:
 

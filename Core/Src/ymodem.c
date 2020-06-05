@@ -52,9 +52,12 @@ enum parser_status_en{
 enum command_lst_en{			//declaration order must be the as uint8_t File_cmd[CMD_QTY][CMD_SIZE+1]
 	CONFIGNAME,
 	FILTERNAME,
-	WRITECOEF,
-	FILTERCOEF,
-	CFGREGIST,
+	WRITECOEF,					//used by 2.0 speaker config
+	WRITECOEFALIAS,				//used by 2.1 & 1.1 speaker config
+	SUBONSTART,
+	CKTASSTART,
+	CFGREG,
+	CONFIRMCFGREG,
 	REGADDR,
 	SWAPCOMMAND,
 	EMPTYLINE,
@@ -64,9 +67,8 @@ enum command_lst_en{			//declaration order must be the as uint8_t File_cmd[CMD_Q
 enum file_process_st_en{
 	wait4data,
 	load_ppc3_config,
+	Confirmload_ppc3_config,
 	load_ppc3_filter,
-	load_cust_config,
-	load_cust_data,
 	Drop_ppc3_swap,
 };
 
@@ -75,8 +77,9 @@ enum file_process_st_en{
 #define CR					0x0D
 #define LF					0x0A
 
-#define CMD_SIZE 			4		//size in char of file command level1
-#define CMD_QTY 			7		//number of file command level1
+#define TAG_SIZE 			4		//size in char of tag to detect in the .h file
+#define TAG_QTY 			10		//number of know tag to detect
+
 
 #define LINE_ACQUIRE_SIZE 	20
 
@@ -93,12 +96,15 @@ uint8_t file_name[FILE_NAME_LENGTH];
 //uint EraseCounter = 0x0;
 //uint NbrOfPage = 0;
 
-uint8_t File_cmd[CMD_QTY][CMD_SIZE+1]={
+uint8_t Parser_Tag[TAG_QTY][TAG_SIZE+1]={
 		{'@','c','f','n',},			//config name
 		{'@','f','l','n',},			//filter name
-		{'/','/','w','r',},			//write coeff from ppc3 file
-		{'@','f','l','c',},			//filter coeff
+		{'/','/','w','r',},			//detect write coeff from ppc3 file (used by 2.0 speaker config PPC3 .h file)
+		{'/','/','C','o',},			//detect write coeff from ppc3 file (used by 1.1 or 2.1 speakar config PPC3 .h file)
+		{'Y','M',' ','h',},			//detect start of data chunk aimed at setting on subwoofer channel
+		{'/','/','S','a',},			//detect start of data chunk aimed at setting TAS clocking
 		{'c','f','g','_',},			//cfg_reg registers from ppc3 file
+		{'/','p','r','o',},			//Confirm cfg_reg to avid false detection
 		{'{',' ','0','x',},			//register address from ppc3 file
 		{'/','/','s','w',}			//swap command
 		};
@@ -215,20 +221,21 @@ int Ymodem_Receive (void)
 {
   uint8_t packet_data[PACKET_1K_SIZE + PACKET_OVERHEAD], file_size[FILE_SIZE_LENGTH], *file_ptr;
   int packet_length, session_done, file_done, packets_received, errors, session_begin;
-  int32_t size=0;
-
+  int size=0;
   int x,y, byte_ctr, in_pckt_idx, linelength, inline_idx, cmdparsing ;
   int eeprom_flt_page_ctr, eeprom_cfg_page_ctr, inpage_flt_idx, inpage_cfg_idx ;
+  uint8_t i2creg, i2cdta, type, write_cfg_buffer[EEPROM_PAGESIZE], write_flt_buffer[EEPROM_PAGESIZE], mem2load;
+  uint16_t config_bytes,filterset_bytes;
+  bool first_coeff_line = false;
 
   char linebuffer[LINE_ACQUIRE_SIZE];			//no need to store the whole 80 char line
   char instring[NAMESIZE];
 
-  uint8_t i2creg, i2cdta, type, write_cfg_buffer[EEPROM_PAGESIZE], write_flt_buffer[EEPROM_PAGESIZE], mem2load;
 
   enum command_lst_en command;
   enum file_process_st_en process_status;
 
-  uint16_t config_bytes,filterset_bytes;
+
 
   /* Initialize FlashDestination variable */
   //
@@ -335,7 +342,7 @@ int Ymodem_Receive (void)
 						else
 							if (lineparser_status == cr && packet_data[in_pckt_idx] == LF)
 							{
-								lineparser_status = (inline_idx == 1) ? eoel : eol;				//line acquired correctly but drop if empty
+								lineparser_status = (inline_idx == 1) ? eoel : eol;				//line acquired correctly but dropped if empty
 
 							}
 						if (inline_idx < LINE_ACQUIRE_SIZE && lineparser_status == lineparse)	//load line in buffer (firsts chars only)
@@ -344,55 +351,56 @@ int Ymodem_Receive (void)
 							}
 						inline_idx++;
 						byte_ctr++;
+						if (inline_idx == 80) inline_idx=0;		//avoid too long line as valid data of TI PPC3 file are at the beginnning of the line
 
 						if ((lineparser_status != eol) && ((lineparser_status != eoel))) continue;	//back to main for loop in order to acquire a full line
 
 						/* Once line is acquired, process it to seek for commands */
-						linelength = inline_idx -2;													//remove the two last char acquired : CR LF
+						linelength = inline_idx - 2;    					//remove the two last char acquired : CR LF
 						if (lineparser_status == eoel)
 						{
 							command = EMPTYLINE;
 						}
-						else if (linelength < CMD_SIZE)						//line with length < size of a command couldn't contain a command
+						else if (linelength < TAG_SIZE)						//line with length < size of a command couldn't contain a command
 						{
 							command = NOCOMMAND;
 						}
 						else
-						{
+						{													//here,parse the line for registered Tag
 							cmdparsing = SEARCH;
 							command = NOCOMMAND;
-							for (inline_idx=0 ; inline_idx < linelength-CMD_SIZE+1; inline_idx++)	//test each char of the buffer
+							for (inline_idx=0 ; inline_idx < linelength-TAG_SIZE+1; inline_idx++)	//test each char of the buffer
 							{
-								for (y=0; y < CMD_QTY; y++)	File_cmd[y][CMD_SIZE] = SEARCH;			//Restart a search, set search flag of each command in the array
-								for (x=0; x < CMD_SIZE; x++)										//test for each char of the line if a command begin
+								for (y=0; y < TAG_QTY; y++)	Parser_Tag[y][TAG_SIZE] = SEARCH;		//Restart a search, set search flag of each command in the array
+								for (x=0; x < TAG_SIZE; x++)										//test for each char of the line if a command begin
 								{
-									for (y=0; y < CMD_QTY; y++)										//Test the char across the command array
+									for (y=0; y < TAG_QTY; y++)										//Test the char across the command array
 									{
-										if(File_cmd[y][CMD_SIZE] == SEARCH)
+										if(Parser_Tag[y][TAG_SIZE] == SEARCH)
 										{
-											if (linebuffer[inline_idx+x] == File_cmd[y][x])			//is the character part of a registered command ?
+											if (linebuffer[inline_idx+x] == Parser_Tag[y][x])		//is the character part of a registered command ?
 											{
-												if ( x == CMD_SIZE-1)								//is last character of command reach ?
+												if ( x == TAG_SIZE-1)								//is last character of command reach ?
 												{
 													command = y;									//last character matched, command identified
 												}
 												else cmdparsing = ONGOING;							//one match find, continue parsing
 											}
-										else File_cmd[y][CMD_SIZE] = NOMATCH;
+										else Parser_Tag[y][TAG_SIZE] = NOMATCH;
 										}
 									}
 								if (command != NOCOMMAND) break;						// a command is identified, exit from 2nd loop
 								}
-							if (command != NOCOMMAND) break;						// a command is identified, exit from 1st loop
+							if (command != NOCOMMAND) break;							// a command is identified, exit from 1st loop
 							}
 						}
+						inline_idx += TAG_SIZE;											//point to next character in the line
 
 						/* Check if a command as been identified, in order to process it or seek for a new line */
-						inline_idx += CMD_SIZE;									//point to next character in the line
 						x=0;
 						switch (command)
 						{
-							case CONFIGNAME:										// '@cfn' command
+							case CONFIGNAME:										// '@cfn' command. Set the name of the Config
 								y = linelength-(inline_idx+1);
 								if (y > 1)
 								{
@@ -405,7 +413,7 @@ int Ymodem_Receive (void)
 								Update_preset_name(config2load, instring,'C');
 								break;
 
-							case FILTERNAME:										// '@fln' command
+							case FILTERNAME:										// '@fln' Tag. Set the name of the FilterSet
 								y = linelength-(inline_idx+1);
 								if (y > 1)
 								{
@@ -418,19 +426,28 @@ int Ymodem_Receive (void)
 								Update_preset_name(filterset2load, instring,'F');
 								break;
 
-							case WRITECOEF:											// '//wr' command
-								if (process_status != load_ppc3_config) break;
+							case SUBONSTART:										// 'YM h' Tag
+							case WRITECOEFALIAS :									// '//Co' Tag
+								process_status = load_ppc3_filter;
+								first_coeff_line = true;
+								break;
+
+							case WRITECOEF:											// '//wr' Tag
 								process_status = load_ppc3_filter;
 								break;
 
-							case FILTERCOEF:										// '@flc' command
-
+							case CKTASSTART:										// '//Sa' Tag
+								if (process_status == load_ppc3_filter) process_status= load_ppc3_config;
 								break;
 
-							case CFGREGIST:											// 'cfg_' command
+							case CFGREG:											// 'cfg_' command
 								if ((process_status != wait4data) && (process_status != load_ppc3_config)) break;
-								process_status = load_ppc3_config;
-								//instring[2]='\0';
+								process_status = Confirmload_ppc3_config;
+								break;
+
+							case CONFIRMCFGREG:
+								if (process_status == Confirmload_ppc3_config) process_status = load_ppc3_config;
+								else process_status = wait4data;
 								break;
 
 							case REGADDR:											// '{  0' command
@@ -473,11 +490,14 @@ int Ymodem_Receive (void)
 										}
 								break;
 
-							case EMPTYLINE:											//Emptyline close the filterset part of ppc3 file
-								if ((process_status == load_ppc3_filter)||(process_status == Drop_ppc3_swap))
+							case EMPTYLINE:		//Emptyline is end of FilterSet bloc or end of drop swap
+								if (process_status == Drop_ppc3_swap) process_status = load_ppc3_config;	//back to upper level command
+								else if (process_status == load_ppc3_filter)
 									{
-										process_status = load_ppc3_config;			//back to upper level command
+									if (first_coeff_line != true) process_status = load_ppc3_config;
+									else first_coeff_line = false;
 									}
+								else if (process_status == Confirmload_ppc3_config) process_status = wait4data;
 								break;
 
 							case SWAPCOMMAND:										//  '//sw' command
@@ -488,7 +508,7 @@ int Ymodem_Receive (void)
 								break;
 
 							case NOCOMMAND:
-
+								if (process_status == Confirmload_ppc3_config) process_status = wait4data;
 								break;
 						}
 

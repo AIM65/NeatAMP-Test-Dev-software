@@ -56,13 +56,21 @@ const char msg4[]={"Preset to play"};
 const char msg5[]={"Preset to erase"};
 const char msg6[]={"Download preset"};
 const char msg7[]={"Status"};
-const uint8_t serial_cmd[]={'?','m','l','p','e','d','s'};
-const char *Serial_cmd_desc[]={msg1,msg2,msg3,msg4,msg5,msg6,msg7};
+const char msg8[]={"Out Crossbar L&R"};
+const char msg9[]={"Out Crossbar L&Sub"};
+const uint8_t serial_cmd[]={'?','m','l','p','e','d','s','b','c'};
+const char *Serial_cmd_desc[]={msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,msg9};
 uint8_t cmd_qty = sizeof(serial_cmd);
 
 const char bad_cmd[]={"Invalid command"};
 const char *config_or_filter[]={" Config#     "," Filter Set# "};
 const char a2cancel[]={"Press 'a' to cancel\r\n"};
+const char textleft[]={"Left"};
+const char textright[]={"Right"};
+const char textsub[]={"Sub"};
+const char textlr[]={"L&R"};
+const char textlsub[]={"L&Sub"};
+
 
 const char prompt={'>'};
 const char crlf[]={0xD,0xA,0x00};
@@ -89,6 +97,20 @@ const uint8_t Cmd_Bloc_Switch2b00[]={
 			0x00, 0x00,
 			0x7f, 0x00,
 		};
+const uint8_t Cmd_Bloc_Switch2p1e[]={
+			0x01, 0x00,			//first 2 bytes are a uint16_t number of register/data couple in the array
+			0x00, 0x1E,
+		};
+const uint8_t Cmd_Bloc_SubOn[]={
+			0x07, 0x00,			//first 2 bytes are a uint16_t number of register/data couple in the array
+			0x00, 0x00,
+			0x7f, 0x8c,
+			0x00, 0x1d,
+			0x28, 0x00,
+			0x29, 0x00,
+			0x2a, 0x00,
+			0x2b, 0x00,
+	};
 
 
 volatile Serial_Eventtd Serial_Event;
@@ -111,13 +133,13 @@ extern union {
 
 /* config_memory and filterset_memory store the preset memory for the TAS.
  *
- * There're 8 presets for the config and 8 for the filterset. They're organized the same way.
+ * There're 5 presets for the config and 5 for the filterset. They're organized the same way.
  * Each preset is defined by a record containing its name and its size in byte.
  * [name on 13 bytes][size in 2 bytes]. size is uint16_t.
- * 8 records are stacked : record0 at @0, record1 at @15, etc..
- * After 8th record, at @120 (8*15), is stored Usage on a byte. Each bit of Usage is a flag.
+ * 5 records are stacked : record0 at @0, record1 at @00+RECORDSIZE, etc..
+ * After 5th record, at 5*RECORDSIZE, is stored Usage on a byte. Each bit of Usage is a flag.
  * Flag=1 -> corresponding preset has been loaded and is usable.
- * bit0 is for record0, bit7 for record7,...Memory #1 is record0
+ * bit0 is for record0, bit4 for record4,...Memory #1 is record0
  * config memory is stored in pages 2 and 3 of EEPROM.
  * filterset memory is stored in pages 4 and 5 of EEPROM.
  *
@@ -139,8 +161,17 @@ uint8_t filterset2load, config2load;
 void Manage_serial_event()
 {
 	uint32_t status,temp,temp1;
-	char str[15];
+	static enum
+	{
+		Left_out,
+		Right_out,
+		LR_out,
+		Sub_out,
+		LSub_out,
+	} out_crossbar = Right_out;
+	char str[19];
 	float gvdd;
+	uint32_t coeff[6];
 
 	switch(Serial_Event){
 	case CommandLine:
@@ -166,22 +197,22 @@ void Manage_serial_event()
 		Serial_PutString(a2cancel);
 		do
 			{
-				Serial_PutString("Choose Config memory (1-8) : ");
+				Serial_PutString("Choose Config memory (1-5) : ");
 				__HAL_UART_CLEAR_FLAG(&huart1,UART_FLAG_ORE);
 				temp=USART1->RDR;								//clear RXNE and empty buffer
 				status=GetIntegerInput(&temp);
 			}
-		while ((temp <1 || temp >8 ) && status);
+		while ((temp <1 || temp >PRESETQTY ) && status);
 		Serial_PutString(crlf);
 		if (status) config2load = (uint8_t)temp;
 		do
 			{
-				Serial_PutString("Choose Filter Set memory (1-8) : ");
+				Serial_PutString("Choose Filter Set memory (1-5) : ");
 				__HAL_UART_CLEAR_FLAG(&huart1,UART_FLAG_ORE);
 				temp=USART1->RDR;								//clear RXNE and empty buffer
 				status=GetIntegerInput(&temp);
 			}
-		while ((temp <1 || temp >8 ) && status);
+		while ((temp <1 || temp >PRESETQTY ) && status);
 		Serial_PutString(crlf);
 		if (status) filterset2load = (uint8_t)temp;
 		Serial_Event = CommandLine;
@@ -191,12 +222,12 @@ void Manage_serial_event()
 
 	case Memory2erase:
 		Display_memory();
-		Serial_PutString("Press C# or F# (C1, F8,...) to delete a preset\r\n");
+		Serial_PutString("Press C# or F# (C1, F5,...) to delete a preset\r\n");
 		Serial_PutString("Everything else will cancel : ");
 		GetInputString(str);
 		if (str[0]=='C')
 		{
-			if (str[1] > '0' || str[1] < ':')
+			if (str[1] > '0' || str[1] < '6')
 			{
 				temp = str[1]-0x30;
 				if (temp != user_param.boards_param.m_config)
@@ -205,12 +236,11 @@ void Manage_serial_event()
 					Save_settings();
 					EEPROM_Update_checksum();
 				}
-
 			}
 		}
 		else if (str[0]=='F')
 		{
-			if (str[1] > '0' || str[1] < ':')
+			if (str[1] > '0' || str[1] < '6')
 			{
 				temp = str[1]-0x30;
 				if (temp != user_param.boards_param.m_filterset)
@@ -231,10 +261,10 @@ void Manage_serial_event()
 		Serial_PutString("Choose setup to use for TAS\r\n\n");
 		do
 			{
-				Serial_PutString("Choose Config memory (1-8) : ");
+				Serial_PutString("Choose Config memory (1-5) : ");
 				status=GetIntegerInput(&temp);
 			}
-		while ((temp <1 || temp >8 ) && status);
+		while ((temp <1 || temp >PRESETQTY ) && status);
 
 		Serial_PutString(crlf);
 
@@ -243,10 +273,10 @@ void Manage_serial_event()
 			{
 				do
 					{
-						Serial_PutString("Choose Filter Set memory (1-8) : ");
+						Serial_PutString("Choose Filter Set memory (1-5) : ");
 						status=GetIntegerInput(&temp1);
 					}
-				while ((temp1 <1 || temp1 >8 ) && status);
+				while ((temp1 <1 || temp1 >PRESETQTY ) && status);
 				if (!((filterset_memory[USAGE_IDX] >> (temp1-1)) & 0x01)) status=0;	//if preset choosed is empty, choice is canceled
 			}
 
@@ -264,8 +294,7 @@ void Manage_serial_event()
 			TAS_Set_Volume(User_Vol);						//Apply current volume
 			TAS_On();
 		}
-
-Serial_Event = CommandLine;
+		Serial_Event = CommandLine;
 		Serial_PutString(crlf);
 		wait4command=true;
 		break;
@@ -278,7 +307,7 @@ Serial_Event = CommandLine;
 			snprintf(str,12,"%2.2x: 0x%2.2x \r\n" , tas_status[temp], tas_status[temp+1]);
 			Serial_PutString(str);
 		}
-		snprintf(str,18,"Volume:  0x%.3x\r\n", User_Vol );
+		snprintf(str,18,"Volume:   0x%.2x\r\n", User_Vol );
 		Serial_PutString(str);
 		snprintf(str,18,"Balance:  0x%.2x\r\n", User_Bal );
 		Serial_PutString(str);
@@ -289,17 +318,42 @@ Serial_Event = CommandLine;
 		gvdd = ADC_Values[1]*0.003743;
 		temp = (uint32_t)gvdd;
 		temp1 = (uint32_t)(100*(gvdd-temp));
-		snprintf(str,14,"%.2u.%.2u V \r\n",temp, temp1);		//allow not to use snprintf with a float
+		snprintf(str,14,"%.2u.%.2u V\r\n",temp, temp1);		//allow not to use snprintf with a float
 		Serial_PutString(str);
+		snprintf(str,10,"Xbar:    ");
+		switch(out_crossbar)
+		{
+			case Left_out:
+			strcat(str,textleft);
+			break;
+			case Right_out:
+			strcat(str,textright);
+			break;
+			case LR_out:
+			strcat(str,textlr);
+			break;
+			case LSub_out:
+			strcat(str,textlsub);
+			break;
+			case Sub_out:
+			strcat(str,textsub);
+			break;
+		}
+		Serial_PutString(str);
+		Serial_PutString(crlf);
 		GPIO_Int_Off(FAULT_Pin);
 		HAL_GPIO_TogglePin(TAS_RST_GPIO_Port, TAS_RST_Pin);
 		HAL_Delay(5);
 		GPIO_Int_On(FAULT_Pin);
 		Amp_Status = (HAL_GPIO_ReadPin(TAS_RST_GPIO_Port, TAS_RST_Pin)) ?  ItRocks : Ok_NoOut;
-		Serial_PutString(crlf);
 		wait4command=true;
 		Serial_Event = CommandLine;
 		Serial_PutString(crlf);
+
+		//debug : enable Sub
+		//TAS_Send_cmdbloc(Cmd_Bloc_SubOn);
+		//TAS_Send_cmdbloc(Cmd_Bloc_Swap);
+
 		break;
 
 	case Not_a_command:
@@ -331,7 +385,73 @@ Serial_Event = CommandLine;
 		Display_memory();
 		Serial_Event = CommandLine;
 		wait4command=true;
-		break;	
+		break;
+
+	case OutXbar1:
+	case OutXbar2:
+		if (Serial_Event == OutXbar1)
+		{
+			switch (out_crossbar)
+			{
+			case Left_out:
+				out_crossbar = Right_out;
+				break;
+			case Right_out:
+				out_crossbar = LR_out;
+				break;
+			default :
+				out_crossbar = Left_out;
+			}
+		}
+		else
+		{
+			switch (out_crossbar)
+			{
+			case Left_out:
+				out_crossbar = Sub_out;
+				break;
+			case Sub_out:
+				out_crossbar = LSub_out;
+				break;
+			default :
+				out_crossbar = Left_out;
+			}
+		}
+		Serial_PutString("  OutXBar <--  ");
+		for(temp=0; temp < sizeof(coeff)/sizeof(coeff[0]); temp++) coeff[temp]=0;
+		TAS_Send_cmdbloc(Cmd_Bloc_Switch2b8c);					//Change to Book 0x8C
+		TAS_Send_cmdbloc(Cmd_Bloc_Switch2p1e);					//Change to Page 0x1E
+				switch(out_crossbar)
+		{
+			case Left_out:
+			Serial_PutString(textleft);
+			coeff[0x00]=0x00008000;								//0x00800000 in little endian as coeff are stored in big endian
+			break;
+			case Right_out:
+			Serial_PutString(textright);
+			coeff[0x04]=0x00008000;
+			break;
+			case LR_out:
+			Serial_PutString(textlr);
+			coeff[0x00]=0x00008000;
+			coeff[0x04]=0x00008000;
+			break;
+			case LSub_out:
+			Serial_PutString(textlsub);
+			coeff[0x00]=0x00008000;
+			coeff[0x05]=0x00008000;
+			break;
+			case Sub_out:
+			Serial_PutString(textsub);
+			coeff[0x05]=0x00008000;
+			break;
+		}
+		TAS_Write_Coeff(OUT_CROSSBAR_REG, coeff, 6);
+		TAS_Send_cmdbloc(Cmd_Bloc_Swap);
+		Serial_Event = CommandLine;
+		Serial_PutString(crlf);
+		Serial_PutString(crlf);
+		wait4command=true;
 
 	default:
 		Serial_Event = CommandLine;
@@ -398,7 +518,6 @@ void Manage_supervision_event()
 	case No_Supervision_event:
 		//Nothing
 		break;
-
 	}
 }
 
@@ -571,7 +690,7 @@ for (int i=0; i<2; i++)
 		Serial_PutString(crlf);
 
 		Usedflag = (i==0) ? config_memory[USAGE_IDX] : filterset_memory[USAGE_IDX];
-		for (int j=1; j < 9; j++)
+		for (int j=1; j <= PRESETQTY; j++)
 		{
 			Serial_Draw_line(5, ' ');
 			SerialPutChar(j + 0x30);
@@ -690,7 +809,7 @@ void TAS_Send_cmdbloc(uint8_t* cmd)
 	uint16_t cmdsize = *cmd | (*(cmd+1)<<8);
 	for (int i=1; i <= cmdsize; i++)
 	{
-		TAS_WR_reg(&cmd[2*i]);
+		TAS_Write_Register(&cmd[2*i]);
 	}
 }
 /*
@@ -717,16 +836,15 @@ void TAS_Set_Volume (uint8_t vol)
 	leftv = k * vol;
 	k= (User_Bal < BAL_CENTER) ? (User_Bal/BAL_CENTER) : 1;
 	rightv = k * vol;
-
 	slope = (MAXGAINSETTING-255) / (float)99;
 
 	TAS_Send_cmdbloc(Cmd_Bloc_Switch2b00);
 	cmddta[0]=0x3D;
 	cmddta[1]=255+slope*rightv;
-	TAS_WR_reg(cmddta);
+	TAS_Write_Register(cmddta);
 	cmddta[0]=0x3E;
 	cmddta[1]=255+slope*leftv;
-	TAS_WR_reg(cmddta);
+	TAS_Write_Register(cmddta);
 }
 
 

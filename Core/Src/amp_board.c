@@ -30,13 +30,13 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 const char Board_ID[EEPROM_PAGESIZE]=" NeatAMP V1 Project by JMF11 / Soft By AIM65 / DIYAudio / 2020";
-const char Version[] = {"\r\n V1.0 - 17 May 2020\r\n"};
+const char Version[] = {"\r\n V2.0 - 05 June 2020\r\n"};
 extern const char crlf[];
 
 volatile uint16_t ADC_Values[2];
 uint8_t tas_addr;
-uint8_t tas_status[]={
-				    0x04,0x00,
+uint8_t tas_status[]={					//This array define the registers which will be displayed by the 's' serial command
+				    0x04,0x00,			//it also provide space to store the value of each registers
 					0x0d,0x00,
 					0x5b,0x00,
 					0x5c,0x00,
@@ -91,6 +91,7 @@ extern const uint8_t Cmd_Bloc_Switch2b00[];
  * I2C2		To deal with other NeatAMP boards (not implemneted)
  * USART1	for serial link
  * GPIO		for IO
+ * NVIC		for interrupts
  *
  *******************************************************************************
  */
@@ -193,7 +194,7 @@ void EEPROM_Update_checksum(void)
 
 /*
  *******************************************************************************************************
- * Check in EEPROM content OK (CRC32), if not load default values
+ * Check if EEPROM content OK (CRC32), if not load default values
  * and return with true.
  *
  * EEPROM Page map :
@@ -207,8 +208,7 @@ void EEPROM_Update_checksum(void)
  * Balance id between 0 and 40
  * 		BAL_LEFT is left, BAL_CENTER is center, BAL_RIGHT is right
  *
- *
- *******************************************************************************************************
+ ********************************************************************************************************
 */
 void EEPROM_Init(void)
 {
@@ -327,7 +327,7 @@ void EEPROM_WR_Page(uint16_t Page, uint8_t* pdata)
 void TAS_Init(void)
 {
 	GPIO_Int_Off(FAULT_Pin);
-	HAL_Delay(500);
+	HAL_Delay(1000);
 	User_Vol = user_param.boards_param.m_volume;
 	User_Bal = user_param.boards_param.m_balance;
 	User_stereo = user_param.boards_param.m_stereo;
@@ -342,7 +342,7 @@ void TAS_Init(void)
 	TAS_Set_Volume (User_Vol);											//Set volume
 	if (!HAL_GPIO_ReadPin(FAULT_GPIO_Port, FAULT_Pin))
 		{
-			Supervision_Event = TAS_Fault;									//Do not start TAS if error at startup
+			Supervision_Event = TAS_Fault;								//Do not start TAS if error at startup
 		}
 	else
 		{
@@ -373,15 +373,35 @@ void TAS_Off(void)
  * register is *pdata; value is *pdata+1
  *******************************************************************************************************
 */
-void TAS_WR_reg(uint8_t* pdata)
+void TAS_Write_Register(uint8_t* pdata)
 {
 	uint8_t adrdta[2];
 	adrdta[0] = (uint8_t) *pdata;
 	adrdta[1] = (uint8_t) *(pdata+1);
-	//adrdta[0] |= 0x80;				//force increment bit
+	//adrdta[0] |= 0x80;
 	if (HAL_I2C_Mem_Write(&hi2c1, tas_addr, adrdta[0],I2C_MEMADD_SIZE_8BIT, &adrdta[1], 1, I2CXTIMEOUT) != HAL_OK)
 			I2Cx_Error();
 }
+
+/*
+ ****************************************************************************************************
+ * Write coefficients in the TAS, assuming Book and Page already setup
+ * Coeff are 32bits word
+ *
+ * Register is TAS sub adress
+ * Coeff is an array of consecutive coeff
+ * Qty is number of coeff to write
+ *
+ ****************************************************************************************************
+ */
+
+void TAS_Write_Coeff(uint8_t Reg, uint32_t* Coeff, int Qty)
+{
+	Reg |= 0x80;		//Set adress autoincrement mode
+	if (HAL_I2C_Mem_Write(&hi2c1, tas_addr, Reg,I2C_MEMADD_SIZE_8BIT, Coeff, Qty*4, I2CXTIMEOUT) != HAL_OK)
+				I2Cx_Error();
+}
+
 
 /*
  *******************************************************************************************************
@@ -410,11 +430,11 @@ void TAS_WR_Preset(uint8_t memory, uint8_t type)
 	for (i=0; i < size; i += 2)
 	{
 		EEPROM_RD(in_eeprom_addr+i, 2, buff);
-		TAS_WR_reg(buff);
+		TAS_Write_Register(buff);
 	}
 	if (type == 'C')
 	{
-		HAL_Delay(5);
+		HAL_Delay(10);
 		HAL_GPIO_WritePin(DAC_MUTE_GPIO_Port, DAC_MUTE_Pin, SET);
 	}
 }
@@ -712,7 +732,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart)
 			case 's':
 				Serial_Event = Status;
 				break;
-		}
+			case 'b':
+				Serial_Event = OutXbar1;
+				break;
+			case 'c':
+				Serial_Event = OutXbar2;
+				break;
+			}
 	}
 	else
 	{

@@ -60,7 +60,6 @@ typedef enum
 	Clip_otw_active,
 	Clipping,
 	Vdd_drop,
-	Too_Hot,
 	I2C_Fault,
 	PSU_Fault,
 	TAS_Fault,

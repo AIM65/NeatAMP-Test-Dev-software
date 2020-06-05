@@ -54,7 +54,9 @@ typedef enum
 	Memory2load,
 	Memory2play,
 	Memory2erase,
-	Status
+	Status,
+	OutXbar1,
+	OutXbar2,
 } Serial_Eventtd;
 
 
@@ -74,27 +76,29 @@ typedef enum
 #define LF					0x0A
 #define CMD_STRING_SIZE     128
 
-#define MAX_FILE_SIZE       50*1024				//50kbytes file size limit
+#define MAX_FILE_SIZE       60*1024				//60kbytes file size limit
 
 // Constants used by the storage of config and filter send data in EEPROM
-#define NAMESIZE			13							// 8.3 format + \0
+#define NAMESIZE			23							// 23 char
 #define RECORDSIZE			(NAMESIZE+2)				// 2 bytes to store number of byte
-#define PRESETQTY			8							// 8 config presets and 8 filterset presets
+#define PRESETQTY			5							// 5 config presets and 5 filterset presets
 #define STORAGESIZE			((PRESETQTY*RECORDSIZE)+1)	//in byte,
 #define USAGE_IDX			STORAGESIZE-1				//
 
 // Memory map constant
-#define CONFIG_SIZE			6		// 6 pages of 64 Bytes
-#define FILTERSET_SIZE		50		// 50 pages
+#define CONFIG_SIZE			3		// 3 pages of 64 Bytes
+#define FILTERSET_SIZE		98		// 98 pages
 
 #define CONFIG1_PAADDR		6
 #define FILTERSET1_PAADDR	(CONFIG1_PAADDR+(CONFIG_SIZE*PRESETQTY))
 
-#define ADC_MAX_VALUE			4095
-#define VOLUME_STEP				4
+//#define ADC_MAX_VALUE			4095
+#define VOLUME_STEP				3
 #define VOL_DEC_SPEED			300			//Volume decrease speed = 1/100 every 500ms
 #define MAXGAINSETTING			48			//See Datasheet Reg 0x3d,0x3e, MAXGAINSETTING set to +6dB
 #define FLASH_DURATION			300			//Led flash duration is 300ms
+
+#define OUT_CROSSBAR_REG		0x2C		//first register in Book 8C- Page 1e of the out Xbar coefficients
 
 /* Exported variables --------------------------------------------------------*/
 
@@ -116,7 +120,6 @@ typedef enum
 void Manage_serial_event(void);
 void Manage_UI_event(void);
 void Manage_supervision_event(void);
-void Manage_delay_event(void);
 
 void Serial_Init(void);
 void Manage_serial_cmd(uint8_t cmd);
