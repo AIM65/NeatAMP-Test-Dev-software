@@ -11,13 +11,14 @@ PCB can be found :
 
 >   <https://www.diyaudio.com/forums/class-d/325826-design-log-neat-2x170w-i2s-i2c-controlled-integrated-dsp-amp-tas3251.html>
 
-In order to run the software a rotary encoder and some LEDs should be added to
+A basic User Interface made of a rotary encoder and some LEDs chould be added to
 NeatAMP main board. Connection diagram can be found in /Hardware folder.
+Software could run without it as most command are available via the serial monitor.
 
 ### Software environment
 
-Project made with ST CubeIDE, using CubeMX and STM32CubeF0 Firmware Package
-V1.11.
+Project made with ST CubeIDE V1.42, using CubeMX and STM32CubeF0 Firmware Package
+V1.11.1
 
 ### Software description
 
@@ -34,11 +35,12 @@ Designing and tuning DSP is easily feasible with TI Pure Path Console 3
 software, but without a TI EVM board, PPC3 software can't connect to the TAS and
 interact with it. PPC3 can produce an output file which content has to be
 loaded into TAS registers. This is a text file (a C .h header file). The board
-software allows to download this file via a serial link, the to process
+software allows to download this file via a serial link, then to process
 it and store it in the board EEPROM. This software allows to easily load those files
 , to store up to five of them in the board EEPROM and to choose the one to play in order
-to do some comparisons and choices. This avoids having to compile your code every time
-you want to change a DSP parameter.
+to do some comparisons and choices. This avoids having to recompile and upload your code
+every time you want to change a DSP parameter, which is the case when the DSP parameters
+are stored in your source code as data.
 
 ###### File handling by the software
 
@@ -66,8 +68,8 @@ detection, reset management, etc..., those are mainly in & out interface data
 and DAC data. The FilterSet data contains DSP data: the various coefficients.
 
 In order to catch Config and FilterSet data, the software parse on line by line
-basis the incoming file while receiving it. It uses the following tags to take actions.
-Tags are group of 4 characters. An empty line is also interpreted as a tag.
+basis the incoming file while receiving it. It uses the tags described below to take actions.
+Tags are group of 4 characters. An empty line is also interpreted as a specific tag.
 
 Format of the.h file change with the kind of speaker configuration you choose in PPC3
 (2.0 vs other). That added some complexification in the tags and the processing made by the software.
@@ -79,14 +81,14 @@ Format of the.h file change with the kind of speaker configuration you choose in
 | //wr      | Start of FilterSet data block                  |
 | //Co      | Start of FilterSet data block (Alias of //wr)  |
 | YM h      | Start of Subwoofer on switch                   |
-| //Sa      | Start of clock configuarion data               |
+| //Sa      | Start of clock configuration data               |
 | cfg\_     | Start of first Config data block               |
 | /pro      | Confirm first Config data block detection      |
 | { 0x      | Load a couple register / data                  |
 | //sw      | Start of Block 4 (swap command)                |
 | emptyline | End of FilterSet data Block                    |
 
-#### Additional goal:
+#### Additional goals:
 
 The software also provide additional housekeeping functions:
 
@@ -99,9 +101,10 @@ led.
 A serial monitor implement various serial commands.
 
 #### Typical usage of the software:
-Straight from PPC3:
--   Generate a .h file with PPC3 (use burst=1)
--   Download it, tell NeatAMpto use it.
+
+-   Straight from PPC3:
+    -   Generate a .h file with PPC3 (use burst=1)
+    -   Download it, tell NeatAMpto use it.
 
 It also feasible to :
 
@@ -114,32 +117,30 @@ It also feasible to :
 -   Download it, tell NeatAMpto use it.
     
     
-Create a file from scratch :
--   add @cfn and @fln tags to set the names
--   add cfg\ tag on next line
--   add /pro tag on the following line
--   add you Config datas with { 0x00, 0x00 } format.
--   add //wr tag on next line
--   add you FilterSet Data with { 0x00, 0x00 } format.    
--   Download it, tell NeatAMpto use it.
+-   Create a file from scratch :
+    -   add @cfn and @fln tags to set the names
+    -   add cfg\ tag on next line
+    -   add /pro tag on the following line
+    -   add you Config datas with { 0x00, 0x00 } format.
+    -   add //wr tag on next line
+    -   add you FilterSet Data with { 0x00, 0x00 } format.    
+    -   Download it, tell NeatAMpto use it.
 
+Tuning consist of :
 -   Listen / measure
-
 -   Adjust your setup in PPC3, regenerate the file
-
 -   Copy/Paste the chunk of the new file in the previous
-
 -   Download it,…and repeat this iterative design process
 
 #### Remark
 
-At first startup, or when an issue is encounter with EEPROM, EEPROM is
+At first startup, or when an issue is encounter with EEPROM, EEPROM content is
 reinitialized. By default the software contains no configuration data and is not
 able to initialize the TAS3251.
 
 NeatAmp should be loaded with a configuration file in order to start the TAS.
 
-A default basic configuration file running I2S 4 wires, stereo, 48kHz can be
+A default basic configuration file running I2S, 4 wires, stereo, 48kHz can be
 found in /PPC3_file folder.
 
 ### Configuration required
@@ -172,6 +173,9 @@ The software communicate to the host PC with a serial link :
 -   s...Status
 -   b...Out Crossbar L&R
 -   c...Out Crossbar L&Sub
+-   *...Volume default
+-   +...Volume +
+-   -...Volume -
 
 
 ###### User Interface:

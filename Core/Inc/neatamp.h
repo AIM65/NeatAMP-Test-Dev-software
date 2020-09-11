@@ -57,6 +57,9 @@ typedef enum
 	Status,
 	OutXbar1,
 	OutXbar2,
+	VolInit,
+	VolUp,
+	VolDn,
 } Serial_Eventtd;
 
 
@@ -95,7 +98,7 @@ typedef enum
 //#define ADC_MAX_VALUE			4095
 #define VOLUME_STEP				3
 #define VOL_DEC_SPEED			300			//Volume decrease speed = 1/100 every 500ms
-#define MAXGAINSETTING			48			//See Datasheet Reg 0x3d,0x3e, MAXGAINSETTING set to +6dB
+#define MAXGAINSETTING			48			//See TAS3251 Datasheet Reg 0x3d,0x3e, MAXGAINSETTING set to +6dB
 #define FLASH_DURATION			300			//Led flash duration is 300ms
 
 #define OUT_CROSSBAR_REG		0x2C		//first register in Book 8C- Page 1e of the out Xbar coefficients

@@ -30,7 +30,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 const char Board_ID[EEPROM_PAGESIZE]=" NeatAMP V1 Project by JMF11 / Soft By AIM65 / DIYAudio / 2020";
-const char Version[] = {"\r\n V2.0 - 05 June 2020\r\n"};
+const char Version[] = {"\r\n V2.1 - 10 Septembre 2020\r\n"};
 extern const char crlf[];
 
 volatile uint16_t ADC_Values[2];
@@ -139,7 +139,7 @@ void I2Cx_Error(void)
 
 /*
  * ******************************************************************************************************
- * 2 function to mask and unmask GPIO interrupts
+ * 2 functions to mask and unmask GPIO interrupts
  * ******************************************************************************************************
 */
 void GPIO_Int_On(uint32_t Pin)
@@ -195,7 +195,6 @@ void EEPROM_Update_checksum(void)
 /*
  *******************************************************************************************************
  * Check if EEPROM content OK (CRC32), if not load default values
- * and return with true.
  *
  * EEPROM Page map :
  * Page0	Board_ID
@@ -204,7 +203,7 @@ void EEPROM_Update_checksum(void)
  * Page4-5	Filter list
  *
  * Volume is between 0 and 99
- * 		0 is mute and 99 is Maximum gain, set by MAXGAINSETTING
+ * 		0 is mute and 99 is Maximum gain. Maximum gain is set by MAXGAINSETTING
  * Balance id between 0 and 40
  * 		BAL_LEFT is left, BAL_CENTER is center, BAL_RIGHT is right
  *
@@ -385,7 +384,7 @@ void TAS_Write_Register(uint8_t* pdata)
 
 /*
  ****************************************************************************************************
- * Write coefficients in the TAS, assuming Book and Page already setup
+ * Write coefficients in the TAS, assuming Book and Page already set in TAS3251
  * Coeff are 32bits word
  *
  * Register is TAS sub adress
@@ -454,7 +453,7 @@ void TAS_Get_Status (void)
 
 /*
  *******************************************************************************************************
- * Get status of the encoder with TM3 encoder mode
+ * Get status of the encoder with TIM3 encoder mode
  *******************************************************************************************************
 */
 ENC_event_td ENC_Manage(void)
@@ -472,7 +471,7 @@ ENC_event_td ENC_Manage(void)
 
 /*
  *******************************************************************************************************
- * Timer based on TIM6, 1ms Time base, 16bits counter
+ * Non blocking timer based on TIM6, 1ms Time base, 16bits counter
  * Provide counters ctr1 & ctr2 & ctr3 which count Ticks from 0 to time base timer overflow (16bit)
  * Provide timers tmr1 & tmr2 & tmr3 which return 0 when timer delay elapsed
  *
@@ -484,14 +483,13 @@ ENC_event_td ENC_Manage(void)
  * Return 1 on Get_tmrX command when timer is running
  *
  *******************************************************************************************************
-*******************************************************************************************************
  * Current usage:
- * ctr1 is used to integrate undervoltage event
- * ctr2 is used to integrate undervoltage event
+ * ctr1 is used to integrate undervoltage event : timeout to avoid false detection
+ * ctr2 is used to integrate undervoltage event : provide a small integration period
  * ctr3 is used to screen pulses on CLIP_OTW
  * tmr1 is used to flash UI Leds
  * tmr2 is used to blink MCU_Led
- * tmr3 is used to set decrease volume speed
+ * tmr3 is used to set auto decrease volume speed on undervoltage and clip conditions
  *******************************************************************************************************
 */
 
@@ -643,10 +641,10 @@ uint32_t TimeCounter(enum Time_cmd_en Cmd, uint32_t duration)
 /******************************************************************************
  * GPIO Interrupt callback
  *
- * Fault, Chain reset and pushbutton trig on falling edge
- * Clip_otw trig on both edge
+ * Fault pin, Chain reset pin and pushbutton pin trig on falling edge.
+ * Clip_otw pin trig on both edges.
  * Fault is on PB3 which is on NVIC EXTI2-3 handler and is set to have higher
- * preemption priority than EXTI4-15 where CLIP_OTW and ADC watchdog are
+ * preemption priority than EXTI4-15 where CLIP_OTW and ADC watchdog are.
  *******************************************************************************
  */
 
@@ -738,7 +736,16 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart)
 			case 'c':
 				Serial_Event = OutXbar2;
 				break;
-			}
+			case '*':
+				Serial_Event = VolInit;
+				break;
+			case '+':
+				Serial_Event = VolUp;
+				break;
+			case '-':
+				Serial_Event = VolDn;
+				break;
+		}
 	}
 	else
 	{

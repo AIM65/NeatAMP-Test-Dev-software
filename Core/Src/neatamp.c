@@ -48,7 +48,6 @@
 extern const char Board_ID[];
 extern const char Version[];
 
-
 const char msg1[]={"Command list"};
 const char msg2[]={"Memory usage"};
 const char msg3[]={"Preset to load"};
@@ -58,8 +57,12 @@ const char msg6[]={"Download preset"};
 const char msg7[]={"Status"};
 const char msg8[]={"Out Crossbar L&R"};
 const char msg9[]={"Out Crossbar L&Sub"};
-const uint8_t serial_cmd[]={'?','m','l','p','e','d','s','b','c'};
-const char *Serial_cmd_desc[]={msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,msg9};
+const char msg10[]={"Volume default"};
+const char msg11[]={"Volume +"};
+const char msg12[]={"Volume -"};
+
+const uint8_t serial_cmd[]={'?','m','l','p','e','d','s','b','c','*','+','-'};
+const char *Serial_cmd_desc[]={msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,msg9,msg10,msg11,msg12};
 uint8_t cmd_qty = sizeof(serial_cmd);
 
 const char bad_cmd[]={"Invalid command"};
@@ -350,7 +353,7 @@ void Manage_serial_event()
 		Serial_Event = CommandLine;
 		Serial_PutString(crlf);
 
-		//debug : enable Sub
+		//debug : enable Sub channel
 		//TAS_Send_cmdbloc(Cmd_Bloc_SubOn);
 		//TAS_Send_cmdbloc(Cmd_Bloc_Swap);
 
@@ -367,6 +370,10 @@ void Manage_serial_event()
 		
 	case CommandList:
 		Serial_PutString("Key...Command");
+		Serial_PutString(crlf);
+		Serial_Draw_line(5, '-');
+		Serial_PutString('+');
+		Serial_Draw_line(18, '-');
 		Serial_PutString(crlf);
 		for (int i=0; i < cmd_qty;i++)
 		{
@@ -421,7 +428,7 @@ void Manage_serial_event()
 		for(temp=0; temp < sizeof(coeff)/sizeof(coeff[0]); temp++) coeff[temp]=0;
 		TAS_Send_cmdbloc(Cmd_Bloc_Switch2b8c);					//Change to Book 0x8C
 		TAS_Send_cmdbloc(Cmd_Bloc_Switch2p1e);					//Change to Page 0x1E
-				switch(out_crossbar)
+		switch(out_crossbar)
 		{
 			case Left_out:
 			Serial_PutString(textleft);
@@ -452,6 +459,41 @@ void Manage_serial_event()
 		Serial_PutString(crlf);
 		Serial_PutString(crlf);
 		wait4command=true;
+		break;
+
+	case VolInit:
+		Serial_PutString("Reset volume");
+		Serial_PutString(crlf);
+		User_Vol = user_param.boards_param.m_volume;
+		TAS_Set_Volume (User_Vol);
+		Serial_Event = CommandLine;
+		wait4command=true;
+		break;
+
+	case VolUp:
+		if (User_Vol < 100-VOLUME_STEP ) User_Vol += VOLUME_STEP;
+		else User_Vol = 100;
+		snprintf(str,-9,"Vol=%u", User_Vol);
+		Serial_PutString(str);
+		Serial_PutString(crlf);
+		Serial_PutString(crlf);
+		TAS_Set_Volume (User_Vol);
+		Serial_Event = CommandLine;
+		wait4command=true;
+		break;
+
+	case VolDn:
+		if (User_Vol > VOLUME_STEP ) User_Vol -= VOLUME_STEP;
+		else User_Vol=0;
+		snprintf(str,9,"Vol=%u", User_Vol);
+		Serial_PutString(str);
+		Serial_PutString(crlf);
+		Serial_PutString(crlf);
+		TAS_Set_Volume (User_Vol);
+		Serial_Event = CommandLine;
+		wait4command=true;
+		break;
+
 
 	default:
 		Serial_Event = CommandLine;

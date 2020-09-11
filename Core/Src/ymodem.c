@@ -49,7 +49,7 @@ enum parser_status_en{
 	Found_cmd,
 };
 
-enum command_lst_en{			//declaration order must be the as uint8_t File_cmd[CMD_QTY][CMD_SIZE+1]
+enum command_lst_en{			//declaration order must be the same as uint8_t Parser_Tag[CMD_QTY][CMD_SIZE+1]
 	CONFIGNAME,
 	FILTERNAME,
 	WRITECOEF,					//used by 2.0 speaker config

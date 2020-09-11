@@ -1,15 +1,11 @@
 #ST CubeIDE & Cube MX files
-*.cproject
-*.mxproject
-*.project
-*.launch
-*.ld
+
 
 #ST Cube IDE files
 /debug
 /release
 /Drivers
-/.settings
+
 
 
 # Prerequisites
