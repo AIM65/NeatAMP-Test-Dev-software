@@ -8,7 +8,7 @@
  * Date : 12 Avr 2020
  * (c) AIM65
  *
- * Based to ymodem.h,  module of ST AN2557 software package
+ * Based on ymodem.h,  module of ST AN2557 software package
  * Do not work with "Tera TERM" terminal emulator; work fine with "PuTTY" : www.extraputty.com
  *
  * *****************************************************************************
@@ -51,6 +51,7 @@
 #define PACKET_OVERHEAD         (PACKET_HEADER + PACKET_TRAILER)
 #define PACKET_SIZE             (128)
 #define PACKET_1K_SIZE          (1024)
+#define YMODEM_PACKET_SIZE		(PACKET_1K_SIZE + PACKET_OVERHEAD)
 
 #define FILE_NAME_LENGTH        (32)
 #define FILE_SIZE_LENGTH        (16)

@@ -74,10 +74,9 @@ const char textsub[]={"Sub"};
 const char textlr[]={"L&R"};
 const char textlsub[]={"L&Sub"};
 
-
 const char prompt={'>'};
 const char crlf[]={0xD,0xA,0x00};
-const char clrscr[]={0x1B,0x5B,0x32,0x4A,0x00};		//VT100 ED2 Code
+const char clrscr[]={0x1B,0x5B,0x32,0x4A,0x00};	//VT100 ED2 Code
 const char home[]={0x1B,0x5B,0x48,0x00};			//VT100 cursorhome Code
 
 const uint8_t Cmd_Bloc_Swap[]={
@@ -126,7 +125,7 @@ bool wait4command;
 uint8_t rx_serial;
 extern uint8_t file_name[];
 extern uint8_t tas_status[];
-extern uint8_t tas_status_siz;
+extern uint8_t tas_status_size;
 extern volatile uint16_t ADC_Values[];
 
 extern union {
@@ -134,13 +133,17 @@ extern union {
 	board_user_param_td boards_param;
 	} user_param;
 
+extern uint8_t User_Vol;
+extern uint8_t User_Bal;
+extern uint8_t User_stereo;
+
 /* config_memory and filterset_memory store the preset memory for the TAS.
  *
  * There're 5 presets for the config and 5 for the filterset. They're organized the same way.
  * Each preset is defined by a record containing its name and its size in byte.
  * [name on 13 bytes][size in 2 bytes]. size is uint16_t.
  * 5 records are stacked : record0 at @0, record1 at @00+RECORDSIZE, etc..
- * After 5th record, at 5*RECORDSIZE, is stored Usage on a byte. Each bit of Usage is a flag.
+ * After 5th record, at @(5*RECORDSIZE), is stored Usage on a byte. Each bit of Usage is a flag.
  * Flag=1 -> corresponding preset has been loaded and is usable.
  * bit0 is for record0, bit4 for record4,...Memory #1 is record0
  * config memory is stored in pages 2 and 3 of EEPROM.
@@ -163,7 +166,8 @@ uint8_t filterset2load, config2load;
 */
 void Manage_serial_event()
 {
-	uint32_t status,temp,temp1;
+	uint32_t status,temp1;
+	int32_t temp;
 	static enum
 	{
 		Left_out,
@@ -304,7 +308,7 @@ void Manage_serial_event()
 
 	case Status:
 		TAS_Get_Status();
-		for (temp=0; temp < tas_status_siz; temp += 2)
+		for (temp=0; temp < tas_status_size; temp += 2)
 		{
 			Serial_PutString("Reg 0x");
 			snprintf(str,12,"%2.2x: 0x%2.2x \r\n" , tas_status[temp], tas_status[temp+1]);
@@ -321,7 +325,7 @@ void Manage_serial_event()
 		gvdd = ADC_Values[1]*0.003743;
 		temp = (uint32_t)gvdd;
 		temp1 = (uint32_t)(100*(gvdd-temp));
-		snprintf(str,14,"%.2u.%.2u V\r\n",temp, temp1);		//allow not to use snprintf with a float
+		snprintf(str,14,"%.2lu.%.2lu V\r\n",temp, temp1);		//allow not to use snprintf with a float
 		Serial_PutString(str);
 		snprintf(str,10,"Xbar:    ");
 		switch(out_crossbar)
@@ -372,7 +376,7 @@ void Manage_serial_event()
 		Serial_PutString("Key...Command");
 		Serial_PutString(crlf);
 		Serial_Draw_line(5, '-');
-		Serial_PutString('+');
+		SerialPutChar('+');
 		Serial_Draw_line(18, '-');
 		Serial_PutString(crlf);
 		for (int i=0; i < cmd_qty;i++)
@@ -473,7 +477,7 @@ void Manage_serial_event()
 	case VolUp:
 		if (User_Vol < 100-VOLUME_STEP ) User_Vol += VOLUME_STEP;
 		else User_Vol = 100;
-		snprintf(str,-9,"Vol=%u", User_Vol);
+		snprintf(str,9,"Vol=%u", User_Vol);
 		Serial_PutString(str);
 		Serial_PutString(crlf);
 		Serial_PutString(crlf);
@@ -493,7 +497,6 @@ void Manage_serial_event()
 		Serial_Event = CommandLine;
 		wait4command=true;
 		break;
-
 
 	default:
 		Serial_Event = CommandLine;
@@ -779,7 +782,7 @@ for (int i=0; i<2; i++)
 */
 void Save_data_page(int pagenumber, uint8_t memory, int type, uint8_t* buffer)
 {
-	uint16_t page;
+	uint16_t page = 0;
 	if ( type=='C')
 		{
 			page = CONFIG1_PAADDR + ((memory-1) * CONFIG_SIZE) + pagenumber;
@@ -846,7 +849,7 @@ void Get_preset_size(uint8_t memory, uint16_t* size, int type)
 			}
 	}
 
-void TAS_Send_cmdbloc(uint8_t* cmd)
+void TAS_Send_cmdbloc(const uint8_t* cmd)
 {
 	uint16_t cmdsize = *cmd | (*(cmd+1)<<8);
 	for (int i=1; i <= cmdsize; i++)
@@ -920,11 +923,9 @@ void Serial_Init(void)
   */
 void Serial_Download(void)
 {
-
-	uint8_t Number[6]; 				//Max file size will be lower than 99999
-	int32_t Size;
-	uint16_t size,i;
 	char Str[16];
+	int Size;
+	uint16_t size;
 
   if ((filterset2load==0) || (config2load==0))
 	  {
@@ -940,6 +941,7 @@ void Serial_Download(void)
 	  Serial_PutString(crlf);
 	  SerialPutString("Waiting for YMODEM upload. Press 'a' to abort\n\r");
 	  Size = Ymodem_Receive();
+	  HAL_Delay(1800);
 	  Serial_PutString(crlf);
 	  Serial_PutString(crlf);
 	  Serial_PutString(crlf);
@@ -955,8 +957,8 @@ void Serial_Download(void)
 		  SerialPutString(Str);
 
 		  SerialPutString(" Size of Config data : ");
-		  Get_preset_size(config2load, &size, 'C');
-		  snprintf(Str, 14,"%u Bytes\r\n", size);
+		  Get_preset_size(config2load, &Size, 'C');
+		  snprintf(Str, 14,"%u Bytes\r\n", Size);
 		  SerialPutString(Str);
 
 		  SerialPutString(" Size of FilterSet data : ");
@@ -966,22 +968,22 @@ void Serial_Download(void)
 		  Serial_Draw_line(37,'-');
 		  SerialPutString(crlf);
 	  }
-		  else if (Size == -1)
-		  {
-			SerialPutString("\n\n\rFile too big\n\r");
-		  }
-		  else if (Size == -2)
-		  {
-			SerialPutString("\n\n\rVerification failed\n\r");
-		  }
-		  else if (Size == -3)
-		  {
-			SerialPutString("\r\n\nAborted\n\r");
-		  }
-		  else
-		  {
-			SerialPutString("\n\rReceive error\n\r");
-		  }
+	  else if (Size == -1)
+	  {
+		SerialPutString("\n\n\rFile too big\n\r");
+	  }
+	  else if (Size == -2)
+	  {
+		SerialPutString("\n\n\rVerification failed\n\r");
+	  }
+	  else if (Size == -3)
+	  {
+		SerialPutString("\r\n\nAborted\n\r");
+	  }
+	  else
+	  {
+		SerialPutString("\n\rReceive error\n\r");
+	  }
 	  }
 }
 
@@ -1039,7 +1041,7 @@ void SerialPutChar(uint8_t c)
   * @param  s: The string to be printed
   * @retval None
   */
-void Serial_PutString(uint8_t *s)
+void Serial_PutString(const char *s)
 {
   while (*s != '\0')
   {
@@ -1065,7 +1067,7 @@ void Serial_Draw_line(uint8_t nbr, char c)
   */
 uint32_t GetIntegerInput(int32_t * num)
 {
-	uint8_t inputstr[16];
+	char inputstr[16];
 	__HAL_UART_CLEAR_FLAG(&huart1,UART_FLAG_ORE);
 	inputstr[0]=USART1->RDR;								//clear RXNE and empty buffer
 	while (1)
@@ -1094,7 +1096,7 @@ uint32_t GetIntegerInput(int32_t * num)
   * @param  buffP: The input string
   * @retval None
   */
-void GetInputString (uint8_t * buffP)
+void GetInputString (char * buffP)
 {
   uint32_t bytes_read = 0;
   uint8_t c = 0;
@@ -1149,7 +1151,7 @@ uint8_t HexStr2Byte (uint8_t *inputstr)
   * @retval 1: Correct
   *         0: Error
   */
-uint32_t Str2Int(uint8_t *inputstr, int32_t *intnum)
+uint32_t Str2Int(const char *inputstr, int *intnum)
 {
   uint32_t i = 0, res = 0;
   uint32_t val = 0;

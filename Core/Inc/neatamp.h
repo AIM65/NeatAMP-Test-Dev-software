@@ -73,13 +73,36 @@ typedef enum
 	Fault
 }Ui_Eventtd;
 
+typedef enum
+{
+	No_Supervision_event,
+	Clip_otw_active,
+	Clipping,
+	Vdd_drop,
+	I2C_Fault,
+	PSU_Fault,
+	TAS_Fault,
+} Supervision_Eventtd;
+
+typedef enum
+{
+	ItRocks,
+	Ok_NoOut,
+	Shutdown,
+	Green,
+	White,
+	Black,
+	Red,
+	Blue
+	} Amp_Statusttd;
+
 /* Exported constants --------------------------------------------------------*/
 // Constants used by Serial Command Line Mode
 #define CR					0x0D
 #define LF					0x0A
 #define CMD_STRING_SIZE     128
 
-#define MAX_FILE_SIZE       60*1024				//60kbytes file size limit
+#define MAX_PPC3_FILE_SIZE       60*1024				//60kbytes file size limit
 
 // Constants used by the storage of config and filter send data in EEPROM
 #define NAMESIZE			23							// 23 char
@@ -138,21 +161,21 @@ void Update_preset_name(uint8_t memory, char* name, int type);
 void Update_preset_size(uint8_t memory, uint16_t* size, int type);
 void Get_preset_size(uint8_t memory, uint16_t* size, int type);
 
-void TAS_Send_cmdbloc(uint8_t* cmd);
+void TAS_Send_cmdbloc(const uint8_t* cmd);
 void TAS_Set_Volume (uint8_t vol);
 
 uint8_t GetKey(void);
 uint32_t SerialKeyPressed(uint8_t *key);
 void SerialPutChar(uint8_t c);
-void Serial_PutString(uint8_t *s);
+void Serial_PutString(const char *s);
 void Serial_Draw_line(uint8_t nbr, char c);
 
 uint32_t GetIntegerInput(int32_t * num);
-void GetInputString(uint8_t * buff);
+void GetInputString(char * buff);
 
 void Int2Str(uint8_t* str,int32_t intnum);
 uint8_t HexStr2Byte (uint8_t *inputstr);
-uint32_t Str2Int(uint8_t *inputstr,int32_t *intnum);
+uint32_t Str2Int(const char *inputstr,int *intnum);
 
 #endif  /* _NEATAMP_H */
 

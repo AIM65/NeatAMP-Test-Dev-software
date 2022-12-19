@@ -152,11 +152,11 @@ static uint Send_Byte (uint8_t c)
 /**
   * @brief  Receive a packet from sender
   * @param  data
-  * @param  length
   * @param  timeout
-  *     0: end of transmission
-  *    -1: abort by sender
-  *    >0: packet length
+  * @param  length
+  *     	 0: end of transmission
+  *    		-1: abort by sender
+  *    		>0: packet length
   * @retval 0: normally return
   *        -1: timeout or packet error
   *         1: abort by user
@@ -222,8 +222,8 @@ int Ymodem_Receive (void)
   uint8_t packet_data[PACKET_1K_SIZE + PACKET_OVERHEAD], file_size[FILE_SIZE_LENGTH], *file_ptr;
   int packet_length, session_done, file_done, packets_received, errors, session_begin;
   int size=0;
-  int x,y, byte_ctr, in_pckt_idx, linelength, inline_idx, cmdparsing ;
-  int eeprom_flt_page_ctr, eeprom_cfg_page_ctr, inpage_flt_idx, inpage_cfg_idx ;
+  int x,y, byte_ctr, in_pckt_idx, linelength, inline_idx = 0;
+  int eeprom_flt_page_ctr = 0, eeprom_cfg_page_ctr = 0, inpage_flt_idx = 0, inpage_cfg_idx = 0 ;
   uint8_t i2creg, i2cdta, type, write_cfg_buffer[EEPROM_PAGESIZE], write_flt_buffer[EEPROM_PAGESIZE], mem2load;
   uint16_t config_bytes,filterset_bytes;
   bool first_coeff_line = false;
@@ -233,7 +233,7 @@ int Ymodem_Receive (void)
 
 
   enum command_lst_en command;
-  enum file_process_st_en process_status;
+  enum file_process_st_en process_status = wait4data;
 
 
 
@@ -287,7 +287,7 @@ int Ymodem_Receive (void)
 
                     /* Test the size of the image to be sent */
                     /* Image size is greater than Flash size */
-                    if (size > (MAX_FILE_SIZE - 1))
+                    if (size > (MAX_PPC3_FILE_SIZE - 1))
                     {
                       /* End session */
                       Send_Byte(CA);
@@ -305,7 +305,7 @@ int Ymodem_Receive (void)
                     inpage_flt_idx=0;				//Initialize the index used to store filter data in the write buffer of eeprom
                     inpage_cfg_idx=0;				//Initialize the index used to store config data in the write buffer of eeprom
                     byte_ctr=0;						//initialize byte counter used by file processor here-under
-                    lineparser_status=eol;			//Initialize the state machine used to load entire lines in linebuffer
+                    lineparser_status = eol;		//Initialize the state machine used to load entire lines in linebuffer
                     process_status = wait4data;		//Initialize the state machine used to process commands in the file
                     instring[NAMESIZE-1]='\0';
                     memcpy(instring,file_name,NAMESIZE-1);				//file name stored in EEPROM will be truncated to NAMESIZE-1
@@ -351,7 +351,7 @@ int Ymodem_Receive (void)
 							}
 						inline_idx++;
 						byte_ctr++;
-						if (inline_idx == 80) inline_idx=0;		//avoid too long line as valid data of TI PPC3 file are at the beginnning of the line
+						if (inline_idx == 80) inline_idx=0;		//avoid too long line as valid data of TI PPC3 file are at the beginning of the line
 
 						if ((lineparser_status != eol) && ((lineparser_status != eoel))) continue;	//back to main for loop in order to acquire a full line
 
@@ -367,7 +367,6 @@ int Ymodem_Receive (void)
 						}
 						else
 						{													//here,parse the line for registered Tag
-							cmdparsing = SEARCH;
 							command = NOCOMMAND;
 							for (inline_idx=0 ; inline_idx < linelength-TAG_SIZE+1; inline_idx++)	//test each char of the buffer
 							{
@@ -384,9 +383,8 @@ int Ymodem_Receive (void)
 												{
 													command = y;									//last character matched, command identified
 												}
-												else cmdparsing = ONGOING;							//one match find, continue parsing
 											}
-										else Parser_Tag[y][TAG_SIZE] = NOMATCH;
+											else Parser_Tag[y][TAG_SIZE] = NOMATCH;
 										}
 									}
 								if (command != NOCOMMAND) break;						// a command is identified, exit from 2nd loop

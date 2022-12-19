@@ -30,7 +30,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 const char Board_ID[EEPROM_PAGESIZE]=" NeatAMP V1 Project by JMF11 / Soft By AIM65 / DIYAudio / 2020";
-const char Version[] = {"\r\n V2.1 - 10 Septembre 2020\r\n"};
+const char Version[] = {"\r\n V2.2 - 05 Decembre 2022\r\n"};
 extern const char crlf[];
 
 volatile uint16_t ADC_Values[2];
@@ -44,7 +44,7 @@ uint8_t tas_status[]={					//This array define the registers which will be displ
 					0x5e,0x00,
 					0x5f,0x00};
 
-uint8_t tas_status_siz=sizeof(tas_status);
+uint8_t tas_status_size=sizeof(tas_status);
 union {
 	uint8_t page1[EEPROM_PAGESIZE];
 	board_user_param_td boards_param;
@@ -63,6 +63,9 @@ extern Supervision_Eventtd Supervision_Event;
 extern Ui_Eventtd Ui_Event;
 extern Amp_Statusttd Amp_Status;
 
+uint8_t User_Vol;
+uint8_t User_Bal;
+uint8_t User_stereo;
 
 extern bool wait4command;
 
@@ -70,6 +73,10 @@ extern const uint8_t Cmd_Bloc_Swap[];
 extern const uint8_t Cmd_Bloc_Unmute[];
 extern const uint8_t Cmd_Bloc_Switch2b8c[];
 extern const uint8_t Cmd_Bloc_Switch2b00[];
+
+uint8_t User_Vol;
+uint8_t User_Bal;
+uint8_t User_stereo;
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -165,7 +172,7 @@ void GPIO_Int_Off(uint32_t Pin)
 */
 void EEPROM_Checksum(chk_res_td *presult)
 {
-  uint16_t prev_chksum;
+  uint16_t prev_chksum = 0;
   uint8_t buffer[EEPROM_PAGESIZE];
 	for (int i=0; i < EEPROM_PAGE; i++)
 	{
@@ -267,7 +274,7 @@ void EEPROM_Init(void)
 
 void EEPROM_WR(uint16_t Addr, enum DataType_en Type, int Data)
 {
-	uint8_t size;
+	uint8_t size = 0;
 	if (HAL_I2C_IsDeviceReady(&hi2c1, EEPROM_BASEADDR, 64, I2CXTIMEOUT)!= HAL_OK) I2Cx_Error();
 	switch (Type){
 		case Byte:
@@ -314,7 +321,7 @@ void EEPROM_RD(uint16_t Addr, uint16_t nbyte, uint8_t* pdata)
 }
 
 //Write a page (of bytes aligned on page boundaries)
-void EEPROM_WR_Page(uint16_t Page, uint8_t* pdata)
+void EEPROM_WR_Page(uint16_t Page, const uint8_t* pdata)
 {
 	if (Page > EEPROM_PAGE-1) I2Cx_Error();
 	if (HAL_I2C_IsDeviceReady(&hi2c1, EEPROM_BASEADDR, 64, I2CXTIMEOUT) != HAL_OK) I2Cx_Error();
@@ -372,7 +379,7 @@ void TAS_Off(void)
  * register is *pdata; value is *pdata+1
  *******************************************************************************************************
 */
-void TAS_Write_Register(uint8_t* pdata)
+void TAS_Write_Register(const uint8_t* pdata)
 {
 	uint8_t adrdta[2];
 	adrdta[0] = (uint8_t) *pdata;
@@ -411,7 +418,7 @@ void TAS_Write_Coeff(uint8_t Reg, uint32_t* Coeff, int Qty)
 */
 void TAS_WR_Preset(uint8_t memory, uint8_t type)
 {
-	uint16_t size,i,in_eeprom_addr;
+	uint16_t size,i,in_eeprom_addr = 0;
 	uint8_t	buff[2];
 	Get_preset_size(memory, &size, type);
 	if (type == 'C')
@@ -440,9 +447,8 @@ void TAS_WR_Preset(uint8_t memory, uint8_t type)
 
 void TAS_Get_Status (void)
 {
-	uint16_t dta=0;
 	TAS_Send_cmdbloc(Cmd_Bloc_Switch2b00);
-	for (int i=0; i < tas_status_siz; i+=2)
+	for (int i=0; i < tas_status_size; i+=2)
 	{
 		HAL_I2C_Mem_Read(&hi2c1, tas_addr, tas_status[i], I2C_MEMADD_SIZE_8BIT, tas_status+i+1, 1, I2CXTIMEOUT);
 	}
@@ -650,7 +656,6 @@ uint32_t TimeCounter(enum Time_cmd_en Cmd, uint32_t duration)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	static uint32_t spot;
 
 	switch (GPIO_Pin){
 

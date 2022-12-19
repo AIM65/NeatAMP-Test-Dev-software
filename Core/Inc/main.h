@@ -54,28 +54,6 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-typedef enum
-{
-	No_Supervision_event,
-	Clip_otw_active,
-	Clipping,
-	Vdd_drop,
-	I2C_Fault,
-	PSU_Fault,
-	TAS_Fault,
-} Supervision_Eventtd;
-
-typedef enum
-{
-	ItRocks,
-	Ok_NoOut,
-	Shutdown,
-	Green,
-	White,
-	Black,
-	Red,
-	Blue
-	} Amp_Statusttd;
 
 
 /* USER CODE END ET */
@@ -95,9 +73,6 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
-uint8_t User_Vol;
-uint8_t User_Bal;
-uint8_t User_stereo;
 
 /* USER CODE END EFP */
 
@@ -136,6 +111,7 @@ uint8_t User_stereo;
 #define CHAIN_RST_Pin GPIO_PIN_9
 #define CHAIN_RST_GPIO_Port GPIOB
 #define CHAIN_RST_EXTI_IRQn EXTI4_15_IRQn
+
 /* USER CODE BEGIN Private defines */
 
 
@@ -146,5 +122,3 @@ uint8_t User_stereo;
 #endif
 
 #endif /* __MAIN_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

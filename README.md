@@ -17,8 +17,8 @@ Software could run without it as most command are available via the serial monit
 
 ### Software environment
 
-Project made with ST CubeIDE V1.42, using CubeMX and STM32CubeF0 Firmware Package
-V1.11.1
+Project made with ST CubeIDE V1.11.0, using CubeMX 6.7 and STM32CubeF0 Firmware Package
+V1.11.3
 
 ### Software description
 
@@ -81,7 +81,7 @@ Format of the.h file change with the kind of speaker configuration you choose in
 | //wr      | Start of FilterSet data block                  |
 | //Co      | Start of FilterSet data block (Alias of //wr)  |
 | YM h      | Start of Subwoofer on switch                   |
-| //Sa      | Start of clock configuration data               |
+| //Sa      | Start of clock configuration data              |
 | cfg\_     | Start of first Config data block               |
 | /pro      | Confirm first Config data block detection      |
 | { 0x      | Load a couple register / data                  |

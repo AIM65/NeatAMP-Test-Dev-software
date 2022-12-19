@@ -105,7 +105,7 @@ typedef struct
 #define BAL_CENTER				20
 #define BAL_RIGHT				(BAL_CENTER+BAL_CENTER)
 #define BAL_LEFT				(BAL_CENTER-BAL_CENTER)
-#define DEFAULT_VOL				10
+#define DEFAULT_VOL				30
 
 #define NOCONFIG				0xFF
 
@@ -118,7 +118,7 @@ typedef struct
 
 #define TIMERSIZE				0xFFFF		//Function TimeCounter uses 16bits counters
 
-#define STM32_VDDA 				3.3f	   				// ADC Vref
+#define STM32_VDDA 				3.3f	   	// ADC Vref
 #define STM32ADC_Resol			4096
 #define STM32ANALOGBITS			12
 #define STM32ANALOGMID			(STM32ADC_Resol/2-1)
@@ -159,14 +159,14 @@ void EEPROM_Checksum(chk_res_td *result);
 void EEPROM_Update_checksum(void);
 void EEPROM_WR(uint16_t Addr, enum DataType_en Type, int Data);
 void EEPROM_RD(uint16_t Addr, uint16_t nbyte, uint8_t* pdata);
-void EEPROM_WR_Page(uint16_t Page, uint8_t* pdata);
+void EEPROM_WR_Page(uint16_t Page, const uint8_t* pdata);
 
 ENC_event_td ENC_Manage(void);
 
 void TAS_Init(void);
 void TAS_On(void);
 void TAS_Off(void);
-void TAS_Write_Register(uint8_t* data);
+void TAS_Write_Register(const uint8_t* data);
 void TAS_Write_Coeff(uint8_t Reg, uint32_t* Coeff, int Qty);
 uint8_t TAS_RD_reg(uint8_t book, uint8_t page, uint8_t reg);
 void TAS_WR_Preset(uint8_t memory, uint8_t type);
