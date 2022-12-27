@@ -105,7 +105,7 @@ typedef struct
 #define BAL_CENTER				20
 #define BAL_RIGHT				(BAL_CENTER+BAL_CENTER)
 #define BAL_LEFT				(BAL_CENTER-BAL_CENTER)
-#define DEFAULT_VOL				0			//this is max value and will set a +24dB gain on TAS3251
+#define DEFAULT_VOL				30
 
 #define NOCONFIG				0xFF
 

@@ -404,7 +404,7 @@ void TAS_Write_Register(const uint8_t* pdata)
 void TAS_Write_Coeff(uint8_t Reg, uint32_t* Coeff, int Qty)
 {
 	Reg |= 0x80;		//Set adress autoincrement mode
-	if (HAL_I2C_Mem_Write(&hi2c1, tas_addr, Reg,I2C_MEMADD_SIZE_8BIT,(uint8_t*)Coeff, Qty*4, I2CXTIMEOUT) != HAL_OK)
+	if (HAL_I2C_Mem_Write(&hi2c1, tas_addr, Reg,I2C_MEMADD_SIZE_8BIT, Coeff, Qty*4, I2CXTIMEOUT) != HAL_OK)
 				I2Cx_Error();
 }
 
@@ -750,8 +750,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart)
 			case '-':
 				Serial_Event = VolDn;
 				break;
-			case 'f':
-				Serial_Event = ClrFlash;
 		}
 	}
 	else

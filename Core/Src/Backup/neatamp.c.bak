@@ -60,11 +60,9 @@ const char msg9[]={"Out Crossbar L&Sub"};
 const char msg10[]={"Volume default"};
 const char msg11[]={"Volume +"};
 const char msg12[]={"Volume -"};
-const char msg13[]={"Reinitialize EEPROM"};
-
 
 const uint8_t serial_cmd[]={'?','m','l','p','e','d','s','b','c','*','+','-','f'};
-const char *Serial_cmd_desc[]={msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,msg9,msg10,msg11,msg12,msg13};
+const char *Serial_cmd_desc[]={msg1,msg2,msg3,msg4,msg5,msg6,msg7,msg8,msg9,msg10,msg11,msg12};
 uint8_t cmd_qty = sizeof(serial_cmd);
 
 const char bad_cmd[]={"Invalid command"};
@@ -300,7 +298,7 @@ void Manage_serial_event()
 			TAS_WR_Preset(user_param.boards_param.m_config, 'C');				//Apply config to TAS
 			TAS_WR_Preset(user_param.boards_param.m_filterset, 'F');
 			TAS_Send_cmdbloc(Cmd_Bloc_Swap);
-			TAS_Set_Volume(User_Vol);											//Apply current volume
+			TAS_Set_Volume(User_Vol);						//Apply current volume
 			TAS_On();
 		}
 		Serial_Event = CommandLine;
@@ -501,10 +499,9 @@ void Manage_serial_event()
 		break;
 
 	case ClrFlash:
-		EEPROM_WR((EEPROM_PAGE*EEPROM_PAGESIZE)-2,HalfWord,0);  //force error to force reinit at startup
-		EEPROM_WR((EEPROM_PAGE*EEPROM_PAGESIZE)-4,HalfWord,0);
-		Serial_PutString("EEPROM will be reset to default at the next restart \r\n");
-		Serial_PutString("Reset NeatAMP for changes to take effect \r\n\n");
+		EEPROM_WR((EEPROM_PAGE*EEPROM_PAGESIZE)-2,HalfWord,0);  //force error to reinit
+		EEPROM_Init();											//reinit
+		Serial_PutString("On board EEPROM cleared \r\n\n");
 		Serial_Event = CommandLine;
 		wait4command=true;
 		break;
@@ -935,8 +932,8 @@ void Serial_Init(void)
 void Serial_Download(void)
 {
 	char Str[16];
-	uint16_t Size;
-
+	int Size;
+	uint16_t size;
 
   if ((filterset2load==0) || (config2load==0))
 	  {
@@ -951,7 +948,7 @@ void Serial_Download(void)
 	  SerialPutChar(0x30+filterset2load);
 	  Serial_PutString(crlf);
 	  SerialPutString("Waiting for YMODEM upload. Press 'a' to abort\n\r");
-	  Size =(uint16_t)Ymodem_Receive();
+	  Size = Ymodem_Receive();
 	  HAL_Delay(1800);
 	  Serial_PutString(crlf);
 	  Serial_PutString(crlf);
@@ -973,8 +970,8 @@ void Serial_Download(void)
 		  SerialPutString(Str);
 
 		  SerialPutString(" Size of FilterSet data : ");
-		  Get_preset_size(filterset2load, &Size, 'F');
-		  snprintf(Str, 14,"%u Bytes\r\n", Size);
+		  Get_preset_size(filterset2load, &size, 'F');
+		  snprintf(Str, 14,"%u Bytes\r\n", size);
 		  SerialPutString(Str);
 		  Serial_Draw_line(37,'-');
 		  SerialPutString(crlf);
@@ -1091,7 +1088,7 @@ uint32_t GetIntegerInput(int32_t * num)
 			return 0;
 		}
 
-		if (Str2Int(inputstr, (int*)num) == 0)
+		if (Str2Int(inputstr, num) == 0)
 		{
 			SerialPutString("Error, Input again: \r\n");
 		}

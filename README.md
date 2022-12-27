@@ -11,7 +11,7 @@ PCB can be found :
 
 >   <https://www.diyaudio.com/forums/class-d/325826-design-log-neat-2x170w-i2s-i2c-controlled-integrated-dsp-amp-tas3251.html>
 
-A basic User Interface made of a rotary encoder and some LEDs chould be added to
+A basic User Interface made of a rotary encoder and some LEDs could be added to
 NeatAMP main board. Connection diagram can be found in /Hardware folder.
 Software could run without it as most command are available via the serial monitor.
 
@@ -104,7 +104,7 @@ A serial monitor implement various serial commands.
 
 -   Straight from PPC3:
     -   Generate a .h file with PPC3 (use burst=1)
-    -   Download it, tell NeatAMpto use it.
+    -   Download it, tell NeatAMP to use it.
 
 It also feasible to :
 
@@ -114,7 +114,7 @@ It also feasible to :
         used)
     -   drop block 1 
     -   edit registers and biquad values
--   Download it, tell NeatAMpto use it.
+-   Download it, tell NeatAMP to use it.
     
     
 -   Create a file from scratch :
@@ -124,7 +124,7 @@ It also feasible to :
     -   add you Config datas with { 0x00, 0x00 } format.
     -   add //wr tag on next line
     -   add you FilterSet Data with { 0x00, 0x00 } format.    
-    -   Download it, tell NeatAMpto use it.
+    -   Download it, tell NeatAMP to use it.
 
 Tuning consist of :
 -   Listen / measure
@@ -176,6 +176,7 @@ The software communicate to the host PC with a serial link :
 -   *...Volume default
 -   +...Volume +
 -   -...Volume -
+-   f...Force EEPROM reinitialization
 
 
 ###### User Interface:

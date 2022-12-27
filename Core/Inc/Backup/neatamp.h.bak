@@ -171,7 +171,7 @@ void SerialPutChar(uint8_t c);
 void Serial_PutString(const char *s);
 void Serial_Draw_line(uint8_t nbr, char c);
 
-uint32_t GetIntegerInput(int32_t *num);
+uint32_t GetIntegerInput(int32_t * num);
 void GetInputString(char * buff);
 
 void Int2Str(uint8_t* str,int32_t intnum);
